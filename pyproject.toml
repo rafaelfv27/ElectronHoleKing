@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "holeking"
+version = "0.1.0"
+description = "Hole-electron and interfragment charge-transfer analysis of sTDA-xTB / sTD-DFT-xTB excitations"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = ["numpy", "pyscf>=2.3"]
+
+[project.optional-dependencies]
+core = ["rdkit"]
+test = ["pytest"]
+
+[project.scripts]
+holeking = "holeking.cli:main"
+
+[tool.setuptools]
+packages = ["holeking"]
