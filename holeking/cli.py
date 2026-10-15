@@ -1,7 +1,10 @@
-"""Command line: ``holeking run geom.xyz`` or ``holeking analyze workdir``."""
+"""Command line: ``holeking run geom.xyz [more.xyz ...]`` or ``holeking analyze workdir``."""
 import argparse
 import csv
+import multiprocessing
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -61,6 +64,20 @@ def analyze_dir(work, args):
     return rows
 
 
+def limit_threads(n):
+    """Cap OpenBLAS/MKL (threadpoolctl) and pyscf's OpenMP at n threads in this process."""
+    from pyscf import lib
+    from threadpoolctl import threadpool_limits
+    lib.num_threads(n)
+    threadpool_limits(n)
+
+
+def run_one(xyz, work, args):
+    run.run(xyz, work, solvent=args.solvent, rpa=args.rpa, nstates=args.nstates, ethr=args.ethr,
+            charge=args.charge, nthreads=args.threads)
+    return analyze_dir(work, args)
+
+
 def write_csv(rows, out):
     fh = open(out, "w", newline="") if out else sys.stdout
     w = csv.DictWriter(fh, fieldnames=list(rows[0]))
@@ -75,29 +92,51 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="holeking", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("run", help="run xtb4stda + stda, then analyze")
-    p_run.add_argument("xyz")
-    p_run.add_argument("--workdir", default=None, help="default: <xyz stem>_holeking")
+    p_run.add_argument("xyz", nargs="+")
+    p_run.add_argument("--workdir", default=None, help="default: <xyz stem>_holeking (single xyz only)")
     p_run.add_argument("--solvent", choices=run.SOLVENTS)
     p_run.add_argument("--rpa", action="store_true", help="sTD-DFT-xTB instead of sTDA-xTB")
     p_run.add_argument("--nstates", type=int, default=10)
     p_run.add_argument("--ethr", type=float, default=7.0, help="stda -e energy threshold (eV)")
-    p_run.add_argument("--threads", type=int, default=1)
+    p_run.add_argument("--jobs", type=int, default=1, help="geometries processed in parallel (default 1)")
     p_ana = sub.add_parser("analyze", help="analyze an existing work directory")
     p_ana.add_argument("workdir")
+    p_ana.set_defaults(jobs=1)
     for p in (p_run, p_ana):
+        p.add_argument("--threads", type=int, default=None,
+                       help="threads per job for xtb4stda, stda and the analysis (default: CPUs // jobs)")
         p.add_argument("--charge", type=int, default=0)
         p.add_argument("--fragments", help="Multiwfn-style fragment file (1-based atoms)")
         p.add_argument("--core", help="core SMARTS or 'btd'; the rest is split into connected pieces")
-        p.add_argument("--grid-level", type=int, default=3)
+        p.add_argument("--grid-level", type=int, default=3,
+                       help="pyscf Becke grid level for Sr and Becke populations (default 3)")
         p.add_argument("--csv", help="output file (default: stdout)")
     args = ap.parse_args(argv)
-    if args.cmd == "run":
-        work = args.workdir or f"{Path(args.xyz).stem}_holeking"
-        run.run(args.xyz, work, solvent=args.solvent, rpa=args.rpa, nstates=args.nstates,
-                ethr=args.ethr, charge=args.charge, nthreads=args.threads)
+    if args.jobs < 1 or (args.threads is not None and args.threads < 1):
+        ap.error("--jobs and --threads must be >= 1")
+    if args.threads is None:
+        args.threads = max(1, (os.cpu_count() or 1) // args.jobs)
+    if args.cmd == "analyze":
+        limit_threads(args.threads)
+        write_csv(analyze_dir(args.workdir, args), args.csv)
+        return
+    if len(args.xyz) > 1 and args.workdir:
+        ap.error("--workdir takes a single xyz; with several, each goes to <xyz stem>_holeking")
+    works = [args.workdir or f"{Path(x).stem}_holeking" for x in args.xyz]
+    if len(set(works)) < len(works):
+        ap.error("two xyz files share a stem, so they would share a work directory")
+    if args.jobs == 1:
+        limit_threads(args.threads)
+        tables = [run_one(x, w, args) for x, w in zip(args.xyz, works)]
     else:
-        work = args.workdir
-    write_csv(analyze_dir(work, args), args.csv)
+        with ProcessPoolExecutor(args.jobs, mp_context=multiprocessing.get_context("spawn"),
+                                 initializer=limit_threads, initargs=(args.threads,)) as pool:
+            tables = list(pool.map(run_one, args.xyz, works, [args] * len(works)))
+    if len(args.xyz) == 1:
+        rows = tables[0]
+    else:
+        rows = [{"xyz": Path(x).stem, **row} for x, t in zip(args.xyz, tables) for row in t]
+    write_csv(rows, args.csv)
 
 
 if __name__ == "__main__":

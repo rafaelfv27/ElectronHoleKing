@@ -36,7 +36,32 @@ For each excited state it reports:
 holeking run geom.xyz --nstates 10 --core btd --csv out.csv            # sTDA-xTB, gas phase
 holeking run geom.xyz --rpa --solvent h2o --fragments frags.txt        # sTD-DFT-xTB, GBSA water
 holeking analyze geom_holeking/ --core "[#6]1~[#6]~[#6]~[#6]2~[#7]~[#16]~[#7]~[#6]~2~[#6]~1"
+holeking run mol1.xyz mol2.xyz mol3.xyz --jobs 8 --threads 1 --core btd --csv all.csv   # batch
 ```
+
+With several xyz files each geometry gets its own `<xyz stem>_holeking` work directory and the CSV gains an
+`xyz` column.
+
+### Choosing jobs, threads and grid level
+
+- `--jobs N` (`run` only): geometries processed in parallel, one process each. Default 1.
+- `--threads T`: threads per job for `xtb4stda`, `stda` and the analysis (OpenBLAS/MKL and pyscf's OpenMP).
+  Default: number of CPUs // jobs. Keep `jobs × threads` at or below the number of logical CPUs.
+- `--grid-level L`: pyscf Becke grid used for Sr and the Becke populations (default 3). D, H, t, centroids and the
+  Mulliken populations are analytic and do not depend on it.
+
+Measured on an i5-10300H (4 cores / 8 threads), `holeking analyze`, 20 to 60 sTDA-xTB work dirs of 25–72 atoms with
+10 states each, against level 3:
+
+| setting | time | largest change |
+|---|---|---|
+| level 3, 4 jobs × 2 threads (60 dirs) | 375 s | — |
+| level 2, 4 jobs × 2 threads (60 dirs) | 276 s | Sr 4.8e-4, Becke fraction 4.8e-5 |
+| level 1, 4 jobs × 2 threads (60 dirs) | 142 s | Sr 2.4e-3 (20 of 60 dirs above 1e-3) |
+| level 3, 8 × 1 / 4 × 2 / 4 × 1 / 2 × 4 (20 dirs) | 117 / 129–133 / 132 / 170 s | identical results |
+
+Level 1 is not recommended: its Sr error exceeds the 1e-3 agreement with Multiwfn used for validation. On this CPU
+one job per logical CPU with one thread each was fastest; hyperthreads did not speed up the BLAS part.
 
 Fragments: a Multiwfn-style file (one fragment per line, 1-based atoms, ranges allowed:
 `1,3,6-10`), or `--core SMARTS|btd`, which takes the matched core plus its hydrogens as fragment 1

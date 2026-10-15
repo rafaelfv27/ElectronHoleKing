@@ -3,6 +3,7 @@
 Multiwfn references were obtained by feeding the same X/Y (written as a Gaussian TD output)
 and the same gs.molden to Multiwfn 2026.7.15, main function 18 -> 1, medium grid.
 """
+import os
 from pathlib import Path
 
 import numpy as np
@@ -92,3 +93,47 @@ def test_btd_core_split():
 def test_wrong_orbital_count_is_rejected(gs):
     with pytest.raises(ValueError, match="does not match"):
         io.read_stda_vectors(BTD / "ciss_a", gs.c_occ.shape[1] - 1, gs.c_vir.shape[1])
+
+
+def _csv_rows(path):
+    import csv
+    with open(path) as fh:
+        return list(csv.DictReader(fh))
+
+
+def test_analyze_threads_option(tmp_path):
+    import os
+    from threadpoolctl import threadpool_info
+    from holeking import cli
+    one, two = tmp_path / "t1.csv", tmp_path / "t2.csv"
+    cli.main(["analyze", str(BTD), "--threads", "2", "--csv", str(two)])
+    cli.main(["analyze", str(BTD), "--threads", "1", "--csv", str(one)])
+    assert all(i["num_threads"] == 1 for i in threadpool_info() if i["user_api"] == "blas")
+    cli.limit_threads(os.cpu_count() or 1)
+    a, b = _csv_rows(one), _csv_rows(two)
+    assert len(a) == len(b) == 3
+    for ra, rb in zip(a, b):
+        for k in ("sr", "d_index", "t_index"):
+            assert float(ra[k]) == pytest.approx(float(rb[k]), abs=1e-6)
+
+
+def test_workdir_with_several_xyz_is_rejected():
+    from holeking import cli
+    with pytest.raises(SystemExit):
+        cli.main(["run", "a.xyz", "b.xyz", "--workdir", "w"])
+
+
+@pytest.mark.skipif(not (os.environ.get("XTB4STDA_BIN") and os.environ.get("STDA_BIN")),
+                    reason="needs xtb4stda and stda ($XTB4STDA_BIN, $STDA_BIN, $XTB4STDAHOME)")
+def test_run_several_xyz_in_parallel(tmp_path, monkeypatch):
+    import shutil
+    from holeking import cli
+    for name in ("a.xyz", "b.xyz"):
+        shutil.copy(BTD / "geom.xyz", tmp_path / name)
+    monkeypatch.chdir(tmp_path)
+    cli.main(["run", "a.xyz", "b.xyz", "--jobs", "2", "--threads", "1", "--nstates", "3", "--csv", "out.csv"])
+    rows = _csv_rows(tmp_path / "out.csv")
+    assert [r["xyz"] for r in rows] == ["a"] * 3 + ["b"] * 3
+    for ra, rb in zip(rows[:3], rows[3:]):                       # same geometry in both jobs
+        assert float(ra["energy_ev"]) == pytest.approx(float(rb["energy_ev"]), abs=1e-3)
+        assert float(ra["sr"]) == pytest.approx(float(rb["sr"]), abs=1e-4)
