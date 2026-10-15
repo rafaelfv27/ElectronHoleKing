@@ -99,20 +99,27 @@ class Analyzer:
                 res.frag_hole["mulliken"] = self._frag(self._mulliken_atoms(d_hole))
                 res.frag_ele["mulliken"] = self._frag(self._mulliken_atoms(d_ele))
             x, y = exc.x, exc.y
-            hole_c, hole_w, cut_h = _natural(x @ x.T - y @ y.T, self.gs.c_occ)
-            ele_c, ele_w, cut_e = _natural(x.T @ x - y.T @ y, self.gs.c_vir)
+            hole_v, hole_w, cut_h = _natural(x @ x.T - y @ y.T)
+            ele_v, ele_w, cut_e = _natural(x.T @ x - y.T @ y)
             res.grid_discarded = max(cut_h, cut_e)
-            natural.append((hole_c, hole_w, ele_c, ele_w))
+            natural.append((hole_v, hole_w, ele_v, ele_w))
             results.append(res)
+        # all states in one product per block; the columns of state k start at start_h[k] / start_e[k]
+        hole_v, hole_w, ele_v, ele_w = (np.hstack([n[i] for n in natural]) for i in range(4))
+        start_h = np.cumsum([0] + [len(n[1]) for n in natural[:-1]])
+        start_e = np.cumsum([0] + [len(n[3]) for n in natural[:-1]])
+        nocc = self.gs.c_occ.shape[1]
+        c_mo = np.hstack([self.gs.c_occ, self.gs.c_vir])
         atom_h = np.zeros((len(results), mol.natm))
         atom_e = np.zeros((len(results), mol.natm))
         for p0 in range(0, len(g.weights), GRID_BLOCK):
             sl = slice(p0, p0 + GRID_BLOCK)
-            ao = mol.eval_gto("GTOval", g.coords[sl])
+            phi = mol.eval_gto("GTOval", g.coords[sl]) @ c_mo   # MOs on the grid, shared by all states
+            rho_h_all = np.add.reduceat((phi[:, :nocc] @ hole_v) ** 2 * hole_w, start_h, axis=1)
+            rho_e_all = np.add.reduceat((phi[:, nocc:] @ ele_v) ** 2 * ele_w, start_e, axis=1)
             w, idx = g.weights[sl], g.atm_idx[sl]
-            for k, (hole_c, hole_w, ele_c, ele_w) in enumerate(natural):
-                rho_h = (ao @ hole_c) ** 2 @ hole_w
-                rho_e = (ao @ ele_c) ** 2 @ ele_w
+            for k in range(len(results)):
+                rho_h, rho_e = rho_h_all[:, k], rho_e_all[:, k]
                 results[k].sr += float(w @ np.sqrt(np.clip(rho_h, 0, None) * np.clip(rho_e, 0, None)))
                 results[k].hole_negative += float(w @ np.minimum(rho_h, 0))
                 atom_h[k] += np.bincount(idx, weights=w * rho_h, minlength=mol.natm)
@@ -127,16 +134,16 @@ class Analyzer:
         return np.array([atom_pop[f].sum() for f in self.fragments]) / atom_pop.sum()
 
 
-def _natural(p_mo, c, tol=NATURAL_TOL):
+def _natural(p_mo, tol=NATURAL_TOL):
     """Eigenvectors of a hole/electron MO density matrix, dropping the smallest weights whose
-    absolute sum stays below tol; returns AO coefficients, weights and the dropped weight."""
+    absolute sum stays below tol; returns MO coefficients, weights and the dropped weight."""
     val, vec = np.linalg.eigh(p_mo)
     order = np.argsort(-np.abs(val))
     val, vec = val[order], vec[:, order]
     tail = np.cumsum(np.abs(val)[::-1])[::-1]       # tail[k] = sum of |val[k:]|
     keep = int(np.searchsorted(-tail, -tol))           # first k with tail[k] < tol
     keep = max(keep, 1)
-    return c @ vec[:, :keep], val[:keep], float(tail[keep]) if keep < len(val) else 0.0
+    return vec[:, :keep], val[:keep], float(tail[keep]) if keep < len(val) else 0.0
 
 
 def ifct(frag_hole, frag_ele):
