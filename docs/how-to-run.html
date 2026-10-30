@@ -56,50 +56,93 @@
 
 <p>HoleKing takes a molecule (an <code>.xyz</code> file), computes its excited states with sTDA-xTB or
 sTD-DFT-xTB, and tells you where the hole and the electron go in each state. You get one CSV file with
-one row per state. This guide takes you from a fresh machine to that CSV.</p>
+one row per state. This guide takes you from a fresh Linux machine to that CSV.</p>
 
 <h2>Set it up (once)</h2>
 
+<p>Every command below goes in a Linux terminal. You need Python 3.9 or newer and git.</p>
+
 <div class="step">
-  <div class="head"><span>Step 1</span>Check you have the programs</div>
-  You need Python 3.9 or newer, plus <code>xtb4stda</code> and <code>stda</code> (or <code>std2</code>).
-  rdkit is optional; you only need it to split the molecule around a core automatically.
+  <div class="head"><span>Step 1</span>Get xtb4stda and stda</div>
+  HoleKing doesn't compute the excited states itself; these two programs from the Grimme group do.
+  Download both programs and their parameter files into a folder called <code>xtb4stda</code> in your home:
+<pre><span class="p">$</span> cd ~
+<span class="p">$</span> git clone https://github.com/grimme-lab/xtb4stda.git   <span class="c"># parameter files</span>
+<span class="p">$</span> cd xtb4stda
+<span class="p">$</span> wget https://github.com/grimme-lab/xtb4stda/releases/download/v1.0/xtb4stda
+<span class="p">$</span> wget https://github.com/grimme-lab/xtb4stda/releases/download/v1.0/stda_v1.6.1
+<span class="p">$</span> chmod +x xtb4stda stda_v1.6.1                           <span class="c"># make them executable</span></pre>
+  If they are already installed on your machine or cluster, skip this step and use their paths in Step 2.
 </div>
 
 <div class="step">
   <div class="head"><span>Step 2</span>Tell HoleKing where they are</div>
-  Add these lines to your <code>~/.bashrc</code> so you only do it once:
-<pre>export XTB4STDA_BIN=/path/to/xtb4stda
-export STDA_BIN=/path/to/stda
-export XTB4STDAHOME=/path/to/folder/with/.param_stda1.xtb</pre>
-  The <code>XTB4STDAHOME</code> folder must hold <code>.param_stda1.xtb</code>, <code>.param_stda2.xtb</code>
-  and, if you use a solvent, <code>.param_gbsa_&lt;solvent&gt;</code>.
+  HoleKing finds the programs through three environment variables. Adding them to
+  <code>~/.bashrc</code> means you only do this once:
+<pre><span class="p">$</span> echo 'export XTB4STDA_BIN=~/xtb4stda/xtb4stda' >> ~/.bashrc
+<span class="p">$</span> echo 'export STDA_BIN=~/xtb4stda/stda_v1.6.1' >> ~/.bashrc
+<span class="p">$</span> echo 'export XTB4STDAHOME=~/xtb4stda' >> ~/.bashrc
+<span class="p">$</span> source ~/.bashrc</pre>
+  <code>XTB4STDAHOME</code> is the folder with the <code>.param_stda1.xtb</code>, <code>.param_stda2.xtb</code>
+  and <code>.param_gbsa_&lt;solvent&gt;</code> files.
 </div>
 
 <div class="step">
-  <div class="head"><span>Step 3</span>Install HoleKing</div>
-  From the folder you downloaded:
-<pre><span class="p">$</span> pip install ".[core]"   <span class="c"># with rdkit</span>
-<span class="p">$</span> pip install .            <span class="c"># without rdkit</span></pre>
+  <div class="head"><span>Step 3</span>Download HoleKing</div>
+<pre><span class="p">$</span> cd ~
+<span class="p">$</span> git clone https://github.com/rafaelfv27/ElectronHoleKing.git
+<span class="p">$</span> cd ElectronHoleKing</pre>
 </div>
 
-<h2>Run it</h2>
+<div class="step">
+  <div class="head"><span>Step 4</span>Create a Python environment</div>
+  This is a private folder for HoleKing's Python packages, so they don't clash with the rest of your
+  system. Many Linux systems refuse <code>pip install</code> without one.
+<pre><span class="p">$</span> python3 -m venv ~/holeking-env
+<span class="p">$</span> source ~/holeking-env/bin/activate</pre>
+  Your prompt now starts with <code>(holeking-env)</code>. <b>Every time you open a new terminal</b>, run the
+  <code>source</code> line again before using HoleKing.
+</div>
 
-<p>Open a terminal in the folder with your <code>.xyz</code> files and type <code>holeking</code>.
-It asks a few questions. Press <b>Enter</b> to keep the value in brackets.</p>
+<div class="step">
+  <div class="head"><span>Step 5</span>Install HoleKing</div>
+  Still inside the <code>ElectronHoleKing</code> folder:
+<pre><span class="p">$</span> pip install .        <span class="c"># HoleKing + numpy + pyscf</span>
+<span class="p">$</span> pip install rdkit    <span class="c"># optional</span></pre>
+  The first line installs HoleKing (the <code>.</code> means “the program in this folder”) together with
+  numpy and pyscf, which it needs. The second is optional: rdkit is only used to split the molecule into
+  fragments around a core (the BTD core option).
+</div>
 
-<pre><span class="p">$</span> holeking
+<div class="step">
+  <div class="head"><span>Step 6</span>Check that it works</div>
+<pre><span class="p">$</span> holeking --help</pre>
+  You should see the list of commands. If you get <code>command not found</code>, the environment from Step 4
+  is not active: run <code>source ~/holeking-env/bin/activate</code>.
+</div>
+
+<h2>Run your first molecule</h2>
+
+<p>The repository comes with a small test molecule, benzothiadiazole. Copy it to a new folder and type
+<code>holeking</code> there. It asks a few questions; for this test press <b>Enter</b> on every one to keep
+the value in brackets.</p>
+
+<pre><span class="p">$</span> mkdir ~/holeking-test &amp;&amp; cd ~/holeking-test
+<span class="p">$</span> cp ~/ElectronHoleKing/tests/data/btd/geom.xyz btd.xyz
+<span class="p">$</span> holeking
 HoleKing: hole-electron analysis of sTDA-xTB excited states. Press Enter to accept [defaults].
 
-xyz file(s) [dad.xyz]:
-solvent (none, water, toluene, thf, ...) [none]: <span class="a">water</span>
+xyz file(s) [btd.xyz]:
+solvent (none, water, toluene, thf, ...) [none]:
 method: tda = sTDA-xTB, rpa = sTD-DFT-xTB [tda]:
 number of excited states [10]:
 molecular charge [0]:
 fragments: 1 = BTD core, 2 = other core (SMARTS), 3 = fragment file, 4 = none [1]:
-save results to [dad.csv]:
+save results to [btd.csv]:
 
-Same as: holeking run dad.xyz --solvent h2o --nstates 10 --charge 0 --core btd --csv dad.csv</pre>
+Same as: holeking run btd.xyz --nstates 10 --charge 0 --core btd --csv btd.csv</pre>
+
+<p>For your own molecules, do the same in the folder with your <code>.xyz</code> files.</p>
 
 <h3>What each question means</h3>
 <table>
@@ -117,7 +160,7 @@ If you type something HoleKing can't use, it says why and asks again. <b>Ctrl+C<
 
 <h2>What you get</h2>
 
-<p>For each molecule HoleKing makes a folder <code>&lt;name&gt;_holeking/</code> with the xtb and stda files and
+<p>For each molecule HoleKing makes a folder <code>&lt;name&gt;_holeking/</code> (here <code>btd_holeking/</code>) with the xtb and stda files and
 their logs, and writes the CSV you asked for. The first columns look like this (2,1,3-benzothiadiazole,
 gas phase):</p>
 
