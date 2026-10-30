@@ -161,13 +161,13 @@ If you type something HoleKing can't use, it says why and asks again. <b>Ctrl+C<
 <h2>What you get</h2>
 
 <p>For each molecule HoleKing makes a folder <code>&lt;name&gt;_holeking/</code> (here <code>btd_holeking/</code>) with the xtb and stda files and
-their logs, and writes the CSV you asked for. The first columns look like this (2,1,3-benzothiadiazole,
-gas phase):</p>
+their logs, and writes the CSV you asked for. The first columns of <code>btd.csv</code> look like this:</p>
 
-<pre>state,energy_ev,wavelength_nm,f,first_bright,sr,d_index,t_index
-1,4.5825,270.56,0.2645,1,0.8997,0.0453,-1.711
-2,4.6532,266.45,0.2073,0,0.8986,0.8825,-0.738
-3,5.0907,243.55,1e-06,0,0.4877,0.5357,-0.537</pre>
+<pre>state  energy_ev  wavelength_nm  f         sr        d_index    t_index
+1      4.6349     267.501        0.265347  0.910232  0.0509087  -1.69007
+2      4.7129     263.074        0.216493  0.900194  0.907645   -0.705231
+3      5.0919     243.493        1e-06     0.486011  0.543807   -0.53132
+...</pre>
 
 <table class="wide">
   <tr><td><code>energy_ev</code>, <code>wavelength_nm</code></td><td>Excitation energy and the matching wavelength.</td></tr>

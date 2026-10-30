@@ -103,7 +103,11 @@ holeking
 ```
 
 HoleKing asks a few questions. For this test, press Enter on every one to keep the value
-in brackets:
+in brackets. This is what the whole run looks like (it takes about 2 seconds):
+
+![Running HoleKing on the test molecule](docs/run-first-molecule.gif)
+
+The questions, as text:
 
 ```
 xyz file(s) [btd.xyz]:
@@ -131,8 +135,8 @@ If you type something it can't use, it tells you why and asks again. Ctrl+C quit
 files and logs, and writes `btd.csv`, one row per excited state:
 
 ```
-state,energy_ev,wavelength_nm,f,first_bright,sr,d_index,t_index,...
-1,4.5825,270.56,0.2645,1,0.8997,0.0453,-1.711,...
+state,energy_ev,wavelength_nm,f,first_bright,near_degenerate_bright,sr,d_index,...
+1,4.6349,267.501,0.265347,1,1,0.910232,0.0509087,...
 ```
 
 | column | meaning |

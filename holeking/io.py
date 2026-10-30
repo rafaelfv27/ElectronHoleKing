@@ -38,6 +38,9 @@ def read_xtb4stda_molden(path):
         ln = lines[i]
         if ln.strip().startswith("["):
             in_gto = ln.strip().upper().startswith("[GTO]")
+            if ln.strip().upper().startswith("[TITLE]"):    # pyscf prints "Unknown section TITLE"
+                i += 1
+                continue
         tok = ln.split()
         if in_gto and len(tok) == 3 and tok[0].lower() in _L:
             l, nprim = _L[tok[0].lower()], int(tok[1])
