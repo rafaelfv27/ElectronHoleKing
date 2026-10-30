@@ -1,0 +1,190 @@
+<!doctype html>
+<!-- Build the PDF: weasyprint how-to-run.html how-to-run.pdf -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HoleKing: how to run it</title>
+<style>
+  @page {
+    size: A4; margin: 2.2cm 2.2cm 2.4cm;
+    @bottom-left { content: "HoleKing · how to run"; font: 300 9pt "Fira Sans"; color: #5F6B7A; }
+    @bottom-right { content: counter(page); font: 300 9pt "Fira Sans"; color: #5F6B7A; }
+  }
+  :root { --ink: #1F2933; --accent: #2B6CB0; --soft: #EBF4FB; --term: #1E2430; --green: #7FD1AE; --muted: #5F6B7A; }
+  body { font: 300 10.5pt/1.5 "Fira Sans", sans-serif; color: var(--ink); }
+  b, strong, th { font-weight: 500; }
+  h2 { font-weight: 500; font-size: 16pt; color: var(--accent); margin: 22pt 0 6pt; break-after: avoid; }
+  h3 { font-weight: 500; font-size: 12pt; margin: 14pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 7pt; }
+  h2 + p { break-after: avoid; }
+  code { font: 8.6pt "JetBrains Mono", monospace; color: #1d4f85; }
+
+  .title { background: var(--accent); color: white; border-radius: 6pt; padding: 18pt 20pt; margin-bottom: 12pt; }
+  .title h1 { font-weight: 500; font-size: 30pt; margin: 0 0 4pt; }
+  .title .sub { font-size: 15pt; margin: 0 0 3pt; }
+  .title .tag { color: #D3E3F3; margin: 0; }
+
+  .step { background: var(--soft); border-radius: 5pt; padding: 9pt 13pt; margin: 0 0 9pt; break-inside: avoid; }
+  .step > .head { font-weight: 500; margin-bottom: 4pt; }
+  .step > .head span { color: var(--accent); margin-right: 8pt; }
+
+  pre { background: var(--term); color: #E6E9EF; border-radius: 5pt; padding: 9pt 11pt; margin: 5pt 0 8pt;
+        font: 8.4pt/1.55 "JetBrains Mono", monospace; white-space: pre-wrap; break-inside: avoid; }
+  pre .p { color: var(--green); }
+  pre .a { color: var(--green); }
+  pre .c { color: #8A93A3; }
+
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; break-inside: avoid; }
+  th { text-align: left; border-bottom: 1.2pt solid var(--ink); padding: 3pt 6pt 3pt 0; }
+  td { vertical-align: top; padding: 4pt 8pt 4pt 0; border-bottom: 0.5pt solid #D5DBE2; }
+  td:first-child { font-weight: 500; white-space: nowrap; }
+  td:first-child code { white-space: nowrap; }
+  table.wide td:first-child { white-space: normal; width: 38%; }
+
+  dl dt { font-weight: 500; color: var(--accent); margin-top: 6pt; }
+  dl dd { margin: 0 0 2pt; }
+  .foot { color: var(--muted); font-size: 9pt; margin-top: 24pt; }
+</style>
+</head>
+<body>
+
+<div class="title">
+  <h1>HoleKing</h1>
+  <p class="sub">How to run it</p>
+  <p class="tag">Hole–electron and charge-transfer analysis of sTDA-xTB excited states</p>
+</div>
+
+<p>HoleKing takes a molecule (an <code>.xyz</code> file), computes its excited states with sTDA-xTB or
+sTD-DFT-xTB, and tells you where the hole and the electron go in each state. You get one CSV file with
+one row per state. This guide takes you from a fresh machine to that CSV.</p>
+
+<h2>Set it up (once)</h2>
+
+<div class="step">
+  <div class="head"><span>Step 1</span>Check you have the programs</div>
+  You need Python 3.9 or newer, plus <code>xtb4stda</code> and <code>stda</code> (or <code>std2</code>).
+  rdkit is optional; you only need it to split the molecule around a core automatically.
+</div>
+
+<div class="step">
+  <div class="head"><span>Step 2</span>Tell HoleKing where they are</div>
+  Add these lines to your <code>~/.bashrc</code> so you only do it once:
+<pre>export XTB4STDA_BIN=/path/to/xtb4stda
+export STDA_BIN=/path/to/stda
+export XTB4STDAHOME=/path/to/folder/with/.param_stda1.xtb</pre>
+  The <code>XTB4STDAHOME</code> folder must hold <code>.param_stda1.xtb</code>, <code>.param_stda2.xtb</code>
+  and, if you use a solvent, <code>.param_gbsa_&lt;solvent&gt;</code>.
+</div>
+
+<div class="step">
+  <div class="head"><span>Step 3</span>Install HoleKing</div>
+  From the folder you downloaded:
+<pre><span class="p">$</span> pip install ".[core]"   <span class="c"># with rdkit</span>
+<span class="p">$</span> pip install .            <span class="c"># without rdkit</span></pre>
+</div>
+
+<h2>Run it</h2>
+
+<p>Open a terminal in the folder with your <code>.xyz</code> files and type <code>holeking</code>.
+It asks a few questions. Press <b>Enter</b> to keep the value in brackets.</p>
+
+<pre><span class="p">$</span> holeking
+HoleKing: hole-electron analysis of sTDA-xTB excited states. Press Enter to accept [defaults].
+
+xyz file(s) [dad.xyz]:
+solvent (none, water, toluene, thf, ...) [none]: <span class="a">water</span>
+method: tda = sTDA-xTB, rpa = sTD-DFT-xTB [tda]:
+number of excited states [10]:
+molecular charge [0]:
+fragments: 1 = BTD core, 2 = other core (SMARTS), 3 = fragment file, 4 = none [1]:
+save results to [dad.csv]:
+
+Same as: holeking run dad.xyz --solvent h2o --nstates 10 --charge 0 --core btd --csv dad.csv</pre>
+
+<h3>What each question means</h3>
+<table>
+  <tr><td>xyz file(s)</td><td>One or more geometries. Wildcards work: <code>*.xyz</code>.</td></tr>
+  <tr><td>solvent</td><td><code>none</code>, or one of: acetone, acetonitrile, benzene, ch2cl2, chcl3, cs2, dmso,
+    ether, water (h2o), methanol, thf, toluene.</td></tr>
+  <tr><td>method</td><td><code>tda</code> (sTDA-xTB) is the fast default. <code>rpa</code> (sTD-DFT-xTB) is a bit slower.</td></tr>
+  <tr><td>excited states</td><td>How many states to compute, counted from the lowest.</td></tr>
+  <tr><td>charge</td><td>Total charge of the molecule.</td></tr>
+  <tr><td>fragments</td><td>How to split the molecule into donor/acceptor parts. See <i>Fragments</i> below.</td></tr>
+  <tr><td>save results to</td><td>Name of the CSV file.</td></tr>
+</table>
+<p>With more than one xyz file it also asks how many molecules to run at the same time.
+If you type something HoleKing can't use, it says why and asks again. <b>Ctrl+C</b> quits.</p>
+
+<h2>What you get</h2>
+
+<p>For each molecule HoleKing makes a folder <code>&lt;name&gt;_holeking/</code> with the xtb and stda files and
+their logs, and writes the CSV you asked for. The first columns look like this (2,1,3-benzothiadiazole,
+gas phase):</p>
+
+<pre>state,energy_ev,wavelength_nm,f,first_bright,sr,d_index,t_index
+1,4.5825,270.56,0.2645,1,0.8997,0.0453,-1.711
+2,4.6532,266.45,0.2073,0,0.8986,0.8825,-0.738
+3,5.0907,243.55,1e-06,0,0.4877,0.5357,-0.537</pre>
+
+<table class="wide">
+  <tr><td><code>energy_ev</code>, <code>wavelength_nm</code></td><td>Excitation energy and the matching wavelength.</td></tr>
+  <tr><td><code>f</code></td><td>Oscillator strength: how bright the state is.</td></tr>
+  <tr><td><code>first_bright</code></td><td>1 for the lowest state with real intensity (f at least 5 % of the largest).</td></tr>
+  <tr><td><code>near_degenerate_bright</code></td><td>1 if another bright state lies within 0.1 eV.</td></tr>
+  <tr><td><code>sr</code></td><td>Hole–electron overlap. Close to 1: local excitation. Close to 0: charge transfer.</td></tr>
+  <tr><td><code>d_index</code></td><td>Distance between the hole and electron centres (Å).</td></tr>
+  <tr><td><code>t_index</code></td><td>Positive means hole and electron are well separated (CT).</td></tr>
+  <tr><td><code>hole_fragN_*</code>, <code>ele_fragN_*</code></td><td>Fraction of the hole and of the electron on fragment N
+    (<code>mulliken</code> and <code>becke</code>).</td></tr>
+  <tr><td><code>dpop_fragN_*</code></td><td>Net electrons gained (+) or lost (−) by fragment N.</td></tr>
+  <tr><td><code>ct_intrinsic_*</code></td><td>Fraction of the excitation that is real charge transfer between fragments.</td></tr>
+</table>
+
+<h2>Fragments</h2>
+
+<p>Fragments let you ask <i>“does the electron move from the donor to the acceptor?”</i></p>
+<dl>
+  <dt>1 · BTD core</dt>
+  <dd>The benzothiadiazole core and its hydrogens become fragment 1. Every piece attached to it becomes
+    its own fragment. Needs rdkit.</dd>
+  <dt>2 · Other core</dt>
+  <dd>Same idea, but you describe the core with a SMARTS pattern. It must match exactly once in the molecule.</dd>
+  <dt>3 · Fragment file</dt>
+  <dd>A text file, Multiwfn style: one fragment per line, atom numbers start at 1, ranges allowed.
+    Every atom must be in exactly one fragment.</dd>
+</dl>
+<pre><span class="c"># frags.txt: three fragments</span>
+1-12
+13-25,40
+26-39</pre>
+
+<h2>Many molecules, scripts and clusters</h2>
+
+<p>Interactive mode is for one-off runs. For scripts, use the one-line command it prints:</p>
+<pre><span class="p">$</span> holeking run dad.xyz --solvent h2o --core btd --csv dad.csv
+<span class="p">$</span> holeking run *.xyz --jobs 8 --core btd --csv all.csv     <span class="c"># 8 molecules at a time</span>
+<span class="p">$</span> holeking analyze dad_holeking/ --fragments frags.txt    <span class="c"># redo the analysis only</span>
+<span class="p">$</span> holeking run --help                                     <span class="c"># every option</span></pre>
+<p>With several molecules the CSV gets an extra <code>xyz</code> column. Keep <code>--jobs</code> at or below the
+number of CPUs; one thread per job was the fastest setting we measured. <code>analyze</code> reuses an existing
+folder, so you can try other fragments without running xtb and stda again.</p>
+
+<h2>When something goes wrong</h2>
+
+<table class="wide">
+  <tr><th>Message</th><th>What to do</th></tr>
+  <tr><td><code>xtb4stda parameter files not found</code></td><td><code>XTB4STDAHOME</code> points to the wrong folder, or the
+    <code>.param_gbsa_&lt;solvent&gt;</code> file for your solvent is missing.</td></tr>
+  <tr><td><code>No such file or directory: 'xtb4stda'</code></td><td>Set <code>XTB4STDA_BIN</code> and <code>STDA_BIN</code> (Step 2).</td></tr>
+  <tr><td><code>core pattern matched 0 times</code></td><td>The molecule has no BTD core, or your SMARTS is wrong. Pick another fragment option.</td></tr>
+  <tr><td><code>core pattern matched 2 times</code></td><td>The core appears twice. Use a fragment file instead.</td></tr>
+  <tr><td><code>fragments must cover each of the N atoms exactly once</code></td><td>An atom is missing or repeated in your fragment file.</td></tr>
+  <tr><td><code>... was not written; see the logs</code></td><td>xtb or stda failed. Read <code>xtb4stda.out</code> and
+    <code>stda.out</code> in the <code>_holeking</code> folder.</td></tr>
+</table>
+
+<p class="foot">Results agree with Multiwfn (Sr within 0.001, D within 0.03 Å), and every oscillator strength is
+recomputed and checked against stda. Code and tests: github.com/rafaelfv27/ElectronHoleKing. MIT license.</p>
+
+</body>
+</html>

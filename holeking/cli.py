@@ -1,8 +1,11 @@
-"""Command line: ``holeking run geom.xyz [more.xyz ...]`` or ``holeking analyze workdir``."""
+"""Command line: ``holeking`` (asks questions), ``holeking run geom.xyz [more.xyz ...]`` or
+``holeking analyze workdir``."""
 import argparse
 import csv
+import glob
 import multiprocessing
 import os
+import shlex
 import sys
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -88,7 +91,101 @@ def write_csv(rows, out):
         fh.close()
 
 
+def _ask(question, default, check=str):
+    """Prompt until check(answer) passes; an empty answer takes the default."""
+    while True:
+        answer = input(f"{question} [{default}]: ").strip() or default
+        try:
+            return check(answer)
+        except ValueError as e:
+            print(f"  {e}")
+
+
+def _positive(text):
+    if not text.isdigit() or int(text) < 1:
+        raise ValueError("type a whole number of 1 or more")
+    return int(text)
+
+
+def _integer(text):
+    if not text.lstrip("+-").isdigit():
+        raise ValueError("type a whole number, e.g. 0, 1 or -1")
+    return text
+
+
+def _existing(text):
+    if not Path(text).is_file():
+        raise ValueError(f"file {text!r} not found")
+    return text
+
+
+def _xyz_files(text):
+    files = sorted({f for word in text.split() for f in glob.glob(word)})
+    if not files or not all(f.endswith(".xyz") for f in files):
+        raise ValueError("give one or more .xyz files (wildcards like *.xyz work)")
+    return files
+
+
+def _solvent(text):
+    text = {"water": "h2o", "none": ""}.get(text.lower(), text.lower())
+    if text and text not in run.SOLVENTS:
+        raise ValueError(f"unknown solvent; choose from none, water, {', '.join(run.SOLVENTS)}")
+    return text
+
+
+def _method(text):
+    if text.lower() not in ("tda", "rpa"):
+        raise ValueError("type tda or rpa")
+    return text.lower()
+
+
+def _option(text):
+    if text not in ("1", "2", "3", "4"):
+        raise ValueError("type 1, 2, 3 or 4")
+    return text
+
+
+def _not_empty(text):
+    if not text:
+        raise ValueError("this one has no default")
+    return text
+
+
+def ask():
+    """Interactive mode: ask for the settings of `holeking run` and return its argv."""
+    print("HoleKing: hole-electron analysis of sTDA-xTB excited states. Press Enter to accept [defaults].\n")
+    found = sorted(glob.glob("*.xyz"))
+    xyz = _ask("xyz file(s)", " ".join(found) if found else "", _xyz_files)
+    argv = ["run", *xyz]
+    solvent = _ask("solvent (none, water, toluene, thf, ...)", "none", _solvent)
+    if solvent:
+        argv += ["--solvent", solvent]
+    if _ask("method: tda = sTDA-xTB, rpa = sTD-DFT-xTB", "tda", _method) == "rpa":
+        argv.append("--rpa")
+    argv += ["--nstates", str(_ask("number of excited states", "10", _positive))]
+    argv += ["--charge", _ask("molecular charge", "0", _integer)]
+    choice = _ask("fragments: 1 = BTD core, 2 = other core (SMARTS), 3 = fragment file, 4 = none",
+                  "1", _option)
+    if choice == "1":
+        argv += ["--core", "btd"]
+    elif choice == "2":
+        argv += ["--core", _ask("core SMARTS", "", _not_empty)]
+    elif choice == "3":
+        argv += ["--fragments", _ask("fragment file", "", _existing)]
+    if len(xyz) > 1:
+        jobs = _ask("molecules to run at the same time", str(min(len(xyz), os.cpu_count() or 1)), _positive)
+        argv += ["--jobs", str(jobs)]
+    argv += ["--csv", _ask("save results to", f"{Path(xyz[0]).stem if len(xyz) == 1 else 'results'}.csv")]
+    print(f"\nSame as: holeking {shlex.join(argv)}\n")
+    return argv
+
+
 def main(argv=None):
+    if argv is None and len(sys.argv) == 1:
+        try:
+            argv = ask()
+        except (KeyboardInterrupt, EOFError):
+            sys.exit("\ncancelled")
     ap = argparse.ArgumentParser(prog="holeking", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_run = sub.add_parser("run", help="run xtb4stda + stda, then analyze")

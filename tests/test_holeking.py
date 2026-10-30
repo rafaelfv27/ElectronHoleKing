@@ -137,3 +137,17 @@ def test_run_several_xyz_in_parallel(tmp_path, monkeypatch):
     for ra, rb in zip(rows[:3], rows[3:]):                       # same geometry in both jobs
         assert float(ra["energy_ev"]) == pytest.approx(float(rb["energy_ev"]), abs=1e-3)
         assert float(ra["sr"]) == pytest.approx(float(rb["sr"]), abs=1e-4)
+
+
+def test_interactive_mode_builds_run_command(tmp_path, monkeypatch, capsys):
+    from holeking import cli
+    for name in ("a.xyz", "b.xyz"):
+        (tmp_path / name).write_text("")
+    monkeypatch.chdir(tmp_path)
+    answers = iter(["", "salt water", "water", "rpa", "zero", "", "-1", "9", "2", "", "[#7]~[#16]~[#7]", "x", "2",
+                    ""])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    assert cli.ask() == ["run", "a.xyz", "b.xyz", "--solvent", "h2o", "--rpa", "--nstates", "10",
+                         "--charge", "-1", "--core", "[#7]~[#16]~[#7]", "--jobs", "2", "--csv", "results.csv"]
+    out = capsys.readouterr().out
+    assert "unknown solvent" in out and "type 1, 2, 3 or 4" in out and "no default" in out
